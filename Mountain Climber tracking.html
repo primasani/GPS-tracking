@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracking</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+   
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <style>
+        body {
+            background-color: rgb(56, 54, 54);
+            color: white; 
+        }
+        #map {height: 550px; margin-bottom: 20px;} 
+        .card {margin-bottom: 20px;} 
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">GPS Tracking</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-lg-12">
+            <div id="map"></div>
+        </div>
+        <div class="col-lg-12"> 
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Last Data Received</h4>
+                </div>
+                <div class="card-body"> 
+                    <div class="row">
+                        <table class="table table-borderless">
+                            <tbody>
+                              
+                                <tr>
+                                    <td>Lintang</td>
+                                    <td>: <a id="latitude"></a> </td>
+                                </tr>
+                                <tr>
+                                    <td>Bujur</td>
+                                    <td>: <a id="longitude"></a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-5">
+                            <button id="startPolylineButton" class="btn btn-success">Mulai Tracking</button>
+                        </div>
+                        <div class="col-md-12">
+                            <button type="button" class="btn btn-primary" id="resetButton" style="display: none;">Reset</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q+zqX6gSbd85u4mG4QzX+" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var aboutButton = document.querySelector('.nav-link[href="#"]');
+            aboutButton.addEventListener("click", function() {
+                toggleMapLayer();
+            });
+        });
+
+        var map = L.map('map').setView([0, 0], 15);
+        var satelliteLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+        });
+
+        satelliteLayer.addTo(map); 
+
+        var blueIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+        });
+
+        var redIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+        });
+
+        var greenIcon = new L.Icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+        });
+
+        var startMarker;
+        var currentMarker = L.marker([0, 0], {icon: greenIcon}).addTo(map); 
+        var lastMarker; 
+        var startPolylineButton = document.getElementById('startPolylineButton');
+        var resetButton = document.getElementById('resetButton');
+        var isTracking = false;
+        var markers = [];
+
+        function updateMap(data) {
+            
+            var latitude = parseFloat(data.field1);
+            var longitude = parseFloat(data.field2);
+
+            document.getElementById('latitude').textContent =  latitude.toFixed(6);
+            document.getElementById('longitude').textContent =  longitude.toFixed(6);
+
+            
+            updateMarker(latitude, longitude);
+            if (isTracking) {
+                
+                addMarker(latitude, longitude);
+            }
+
+            
+            map.panTo([latitude, longitude]);
+        }
+
+        function updateMarker(latitude, longitude) {
+            if (isTracking) {
+                if (lastMarker) {
+                    lastMarker.setIcon(blueIcon); 
+                }
+                lastMarker = L.marker([latitude, longitude], {icon: blueIcon}).addTo(map); 
+                lastMarker.bindPopup(`<b>Lintang:</b> ${latitude.toFixed(6)}<br><b>Bujur:</b> ${longitude.toFixed(6)}`).openPopup();
+            } else {
+                if (currentMarker) {
+                    map.removeLayer(currentMarker);
+                }
+                currentMarker = L.marker([latitude, longitude], {icon: greenIcon}).addTo(map); 
+                currentMarker.bindPopup(`<b>Lintang:</b> ${latitude.toFixed(6)}<br><b>Bujur:</b> ${longitude.toFixed(6)}`).openPopup();
+            }
+        }
+
+        function addMarker(latitude, longitude) {
+            var newMarker = L.marker([latitude, longitude], {icon: blueIcon}).addTo(map);
+            newMarker.bindPopup(`<b>Lintang:</b> ${latitude.toFixed(6)}<br><b>Bujur:</b> ${longitude.toFixed(6)}`).openPopup();
+            markers.push(newMarker);
+        }
+
+        function startTracking() {
+            if (!isTracking) {
+                isTracking = true;
+                startPolylineButton.textContent = 'Berhenti';
+                startPolylineButton.classList.remove('btn-success');
+                startPolylineButton.classList.add('btn-danger');
+                resetButton.style.display = 'none'; 
+                if (currentMarker) {
+                    map.removeLayer(currentMarker);
+                }
+                startMarker = L.marker(currentMarker.getLatLng(), {icon: redIcon}).addTo(map); 
+            } else {
+                isTracking = false;
+                startPolylineButton.textContent = 'Mulai Tracking';
+                startPolylineButton.classList.remove('btn-danger');
+                startPolylineButton.classList.add('btn-success');
+                startPolylineButton.disabled = true;
+                resetButton.style.display = 'block'; 
+                if (lastMarker) {
+                    lastMarker.setIcon(greenIcon); 
+                }
+                currentMarker = lastMarker;
+            }
+            console.log('Status Tracking:', isTracking);
+        }
+
+        function resetMap() {
+            isTracking = false;
+            map.eachLayer(function (layer) {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            startPolylineButton.disabled = false;
+            document.getElementById('latitude').textContent = "";
+            document.getElementById('longitude').textContent = "";
+            resetButton.style.display = 'none';
+            fetchData(); 
+        }
+
+        function fetchData() {
+ 
+            fetch('https://api.thingspeak.com/channels/2429046/feeds/last.json?api_key=STSLLISFU8SMH7RR')
+              .then(response => response.json())
+              .then(data => {
+                updateMap(data);
+              })
+              .catch(error => console.error('Error fetching data:', error));
+        }
+
+        setInterval(fetchData, 5000); 
+
+
+        fetchData();
+
+        startPolylineButton.addEventListener('click', startTracking);
+        resetButton.addEventListener('click', resetMap);
+    </script>
+</body>
+</html>
